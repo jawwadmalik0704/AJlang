@@ -17,7 +17,7 @@ warna
 
 Requirements: Visual Studio with the C++ tools (MASM is included) and the Irvine32 library in `C:\Irvine\irvine`. If it lives elsewhere, set the `IRVINE_DIR` environment variable to that folder.
 
-- Command line: `build.bat`, then `run.bat tests\day1.aj`
+- Command line: `build.bat`, then `run.bat yourprogram.aj`
 - Visual Studio: open `AJlang.slnx` and press F5
 
 ## Layout
