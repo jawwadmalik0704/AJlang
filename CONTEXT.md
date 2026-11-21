@@ -39,7 +39,9 @@ AJlang is a tiny beginner scripting language with Hinglish keywords (`set`, `lik
 - **Visual Studio:** open `AJlang.slnx` (project `AJlang.vcxproj`, MASM build customization, Debug|x86). New source files must be added to the `MASM` item list in `AJlang.vcxproj`. The debugger passes `tests\day1.aj` as the argument.
 - Do not commit `.vs`, `build\`, `*.obj`, `*.exe`, `*.pdb`, `*.ilk` (see `.gitignore`).
 - Known harness noise: `vcvars32.bat` may print `'vswhere.exe' is not recognized` when run from automated shells. The build still succeeds.
-- **Day 1 must solve test output capture:** Irvine `WriteString` writes with `WriteConsole`, so output is lost when stdout is redirected to a file or pipe (confirmed on Day 0). Day 1 picks a way to compare output with `tests\dayN.expected`: either a small PowerShell script that reads the console screen buffer, or by-eye checking in a real console. Record the choice in the Progress Log.
+- **The `tests\` and `examples\` folders are local only** (listed in `.gitignore`, so they are not pushed and the friend never sees them). They exist on the user's machine. If they are missing on another machine, recreate them from the descriptions in section 8 before running a day.
+- **Test output capture (solved on Day 1):** Irvine `WriteString` loses output when stdout is redirected, so tests run the program inside a Windows pseudo-console. `tests\run_tests.py` (needs Python and `pip install pywinpty`, developer-only) runs every `tests\*.aj` that has a matching `.expected` file (optional `.input` file is typed into the program) and prints PASS or FAIL. Run it with `python -I tests\run_tests.py` after `build.bat`. Pass a name prefix to run one test, e.g. `day2`.
+- `GetCommandTail` returns a leading space when the program path is quoted (always true under Visual Studio and the test runner), so `ReadFileName` reads the tail into `commandTail`, skips spaces, then copies. Use relative paths or paths without spaces for `.aj` files.
 
 ## 4. Language spec (final, v0.1)
 
@@ -204,6 +206,15 @@ Rules for the plan: each day ends with a working `ajlang.exe`, passing test prog
 - `ReportError` with line numbers, unknown command error, file-not-found error.
 - Done when `tests\day1.aj` (several `likho`, mixed-case keywords, comments, a `ruko` before a last `likho`, one bad line at the end) prints the expected lines and the bad line reports `Line N: ye command samajh nahi aya`.
 
+### Notes from Day 1 for later days
+
+- `lineIndex` always holds the next line to run. `RunProgram` copies it to `currentLine`, increments it, then calls `RunLine`. A jump command only sets `lineIndex` to the line that should run next.
+- `RunLine` skips blank and `#` lines, reads the first word with `ReadWord` (upper-cased into `wordBuffer`, returns the pointer just after it), calls `MatchKeyword` (id from the keyword table in `text.asm`), then compares the id with `KW_*` constants. Every handler returns EAX = 1 to continue or 0 to stop the program.
+- Adding a command: add its word and `KW_` id in `ajlang.inc` and `text.asm` (same order), add a `cmp` and `je` in `RunLine`, add a `DoXxx` procedure with a `PROTO`. Lines like `x+=1` start with a variable name, so Day 2 must check for them when `MatchKeyword` returns `KW_UNKNOWN`.
+- Source rows are already trimmed on the right. `SkipSpaces` handles leading spaces and tabs.
+- `ReportError` prints `Line N:` using `currentLine`. `ShowMessage` prints a message with no line number (used for file errors).
+- Today `/` and `warna` report `ye command samajh nahi aya` because they are not implemented until Day 3.
+
 ### Day 2: Variables, input, math
 - Variable table and cells, `set` number/text, number-vs-text detection, `ParseNumber`.
 - `likho` with `:var` and `::`.
@@ -244,7 +255,7 @@ Command from the user: `Do Day N`.
 | Day | Status | Notes |
 |---|---|---|
 | 0 | done | Spec finalised, context file, repo (private) created. Multi-file MASM project, `build.bat`, `run.bat`, `AJlang.slnx` and `AJlang.vcxproj` set up and verified: both build paths produce `build\ajlang.exe`. Stub `main` prints a banner. Stdout redirection loses Irvine output (see section 3). |
-| 1 | not started | |
+| 1 | done | `LoadProgram` (command-line file or prompt, BOM and CRLF handled, 200-line limit), `SkipSpaces`, `ReadWord`, `MatchKeyword`, dispatch in `RunLine`, `likho` (plain text), `ruko`, `#` comments, `ReportError` with line numbers. `tests\day1.aj` and `day1_error.aj` pass; extra edge cases checked by hand (missing file, 201 lines, empty file, tabs, no final newline). Both `build.bat` and `AJlang.slnx` build. |
 | 2 | not started | |
 | 3 | not started | |
 | 4 | not started | |

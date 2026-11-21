@@ -2,9 +2,11 @@ INCLUDE ajlang.inc
 
 .data
 sourceLines BYTE MAXLINES * LINELEN DUP(0)
+rawBuffer BYTE RAWSIZE DUP(0)
 lineCount DWORD 0
 lineIndex DWORD 0
-fileName BYTE 128 DUP(0)
+currentLine DWORD 0
+fileName BYTE FILENAME_SIZE DUP(0)
 wordBuffer BYTE LINELEN DUP(0)
 
 blockEnd DWORD MAXLINES DUP(0)

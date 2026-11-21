@@ -23,7 +23,5 @@ Requirements: Visual Studio with the C++ tools (MASM is included) and the Irvine
 ## Layout
 
 - `src\` MASM source split by job (`main`, `data`, `loader`, `text`, `vars`, `print`, `logic`, `errors`) plus the shared `ajlang.inc`
-- `tests\` test programs and expected output
-- `examples\` sample AJlang programs
 
 Status: in development. The full language reference will be added on the final day.
