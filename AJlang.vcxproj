@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{6B1F7A52-3C4D-4E8A-9F20-5A7D1C2E8B34}</ProjectGuid>
+    <RootNamespace>AJlang</RootNamespace>
+    <VCProjectVersion>$(VisualStudioVersion)</VCProjectVersion>
+    <IrvineDir Condition="'$(IRVINE_DIR)' == ''">C:\Irvine\irvine</IrvineDir>
+    <IrvineDir Condition="'$(IRVINE_DIR)' != ''">$(IRVINE_DIR)</IrvineDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset Condition="'$(VisualStudioVersion)' == '18.0'">v145</PlatformToolset>
+    <PlatformToolset Condition="'$(VisualStudioVersion)' == '17.0'">v143</PlatformToolset>
+    <PlatformToolset Condition="'$(VisualStudioVersion)' == '16.0'">v142</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+  </ImportGroup>
+  <PropertyGroup>
+    <OutDir>$(MSBuildProjectDirectory)\build\</OutDir>
+    <IntDir>$(MSBuildProjectDirectory)\build\obj\</IntDir>
+    <TargetName>ajlang</TargetName>
+    <LocalDebuggerCommandArguments>tests\day1.aj</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(MSBuildProjectDirectory)</LocalDebuggerWorkingDirectory>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <MASM>
+      <IncludePaths>$(IrvineDir);$(MSBuildProjectDirectory)\src</IncludePaths>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </MASM>
+    <Link>
+      <AdditionalDependencies>Irvine32.lib;kernel32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(IrvineDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <MASM Include="src\main.asm" />
+    <MASM Include="src\data.asm" />
+    <MASM Include="src\loader.asm" />
+    <MASM Include="src\text.asm" />
+    <MASM Include="src\vars.asm" />
+    <MASM Include="src\print.asm" />
+    <MASM Include="src\logic.asm" />
+    <MASM Include="src\errors.asm" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\ajlang.inc" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
+</Project>

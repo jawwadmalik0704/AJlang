@@ -31,13 +31,15 @@ AJlang is a tiny beginner scripting language with Hinglish keywords (`set`, `lik
 
 **One thing outside the labs:** reading the `.aj` file uses Irvine32 `GetCommandTail`, `OpenInputFile`, `ReadFromFile`, `CloseFile`. Reason: a file makes the language real and lets tests run without typing. If the instructor objects, fallback is section 11.
 
-## 3. Toolchain and build
+## 3. Toolchain and build (set up on Day 0, already working)
 
-- MASM `ml.exe` (x86) from Visual Studio 18, Irvine32 in `C:\Irvine\irvine`.
-- Day 1 creates `build.bat` that sets up `vcvars32.bat`, assembles every `src\*.asm`, links with `Irvine32.lib`, `kernel32.lib`, `user32.lib` and produces `ajlang.exe`.
-- Run: `ajlang.exe tests\day1.aj`. With no argument the program asks for the file name.
-- Visual Studio: same sources, project settings from the lab setup (Irvine32 include and library paths). Do not commit `.vs`, `*.obj`, `*.exe`, `*.pdb`, `*.ilk` (see `.gitignore`).
-- Day 1 risk to verify: Irvine `WriteString` may not appear when stdout is redirected. If so, tests are checked by running in a console and comparing with `tests\dayN.expected` by eye, and the Progress Log records it.
+- Assembler: MASM `ml.exe` (x86, 32-bit, `/coff`) from Visual Studio. Library: Irvine32 in `C:\Irvine\irvine` (override with the `IRVINE_DIR` environment variable if it lives elsewhere on a machine).
+- `Irvine32.inc` already sets `.386`, `.model flat,stdcall` and the 4096-byte stack, so source files only `INCLUDE ajlang.inc`.
+- **Command line:** `build.bat` finds Visual Studio with `vswhere`, loads `vcvars32.bat`, assembles every `src\*.asm` into `build\*.obj`, links with `Irvine32.lib kernel32.lib user32.lib` into `build\ajlang.exe`. `run.bat tests\day1.aj` builds if needed and runs. A new `.asm` file in `src\` is picked up automatically.
+- **Visual Studio:** open `AJlang.slnx` (project `AJlang.vcxproj`, MASM build customization, Debug|x86). New source files must be added to the `MASM` item list in `AJlang.vcxproj`. The debugger passes `tests\day1.aj` as the argument.
+- Do not commit `.vs`, `build\`, `*.obj`, `*.exe`, `*.pdb`, `*.ilk` (see `.gitignore`).
+- Known harness noise: `vcvars32.bat` may print `'vswhere.exe' is not recognized` when run from automated shells. The build still succeeds.
+- **Day 1 must solve test output capture:** Irvine `WriteString` writes with `WriteConsole`, so output is lost when stdout is redirected to a file or pipe (confirmed on Day 0). Day 1 picks a way to compare output with `tests\dayN.expected`: either a small PowerShell script that reads the console screen buffer, or by-eye checking in a real console. Record the choice in the Progress Log.
 
 ## 4. Language spec (final, v0.1)
 
@@ -123,16 +125,21 @@ Interpreter, not compiler. Three phases:
 
 ### Source files (split so two people rarely touch the same file)
 
+All of these exist already as compiling files. `ajlang.inc` and `data.asm` are complete for the planned data layout. The other modules are empty and get their procedures on the day that needs them.
+
 | File | Owner (suggested) | Contents |
 |---|---|---|
-| `src\ajlang.inc` | both | `INCLUDE Irvine32.inc`, constants, `PROTO`s, `externdef`s |
-| `src\main.asm` | Jawwad | `main`, program flow, data shared by all |
+| `src\ajlang.inc` | both | `INCLUDE Irvine32.inc`, constants, `externdef`s, and a `PROTO` for every new procedure |
+| `src\data.asm` | both | every shared table and counter (nothing else defines shared data) |
+| `src\main.asm` | Jawwad | `main`, program flow, `RunProgram` |
 | `src\loader.asm` | Ahmed | file reading, `LoadProgram`, `PrescanBlocks` |
 | `src\text.asm` | Ahmed | trimming, word reading, keyword matching, `ParseNumber`, `IsNumberText` |
 | `src\vars.asm` | Jawwad | cell table, `FindVariable`, `DeclareVariable`, get/set value |
 | `src\print.asm` | Jawwad | `likho`, `:var` insertion, `batao` |
 | `src\logic.asm` | Ahmed | conditions, `agar`/`warna`, `loop`, `repeat` |
 | `src\errors.asm` | both | `ReportError` and message strings |
+
+Rules for modules: a procedure that other files call is declared with `PROTO` in `ajlang.inc` and defined with `PROC` in its own file. Only `main.asm` ends with `END main`; every other file ends with `END`.
 
 ### Data layout (all in `.data`, sizes are `=` constants)
 
@@ -189,7 +196,8 @@ Format: `Line N: message`, then stop. Hinglish tone like the spec.
 Rules for the plan: each day ends with a working `ajlang.exe`, passing test programs in `tests\`, a Progress Log entry, and a git push. Never leave the build broken at day end.
 
 ### Day 1: Foundation
-- Create `src\`, `tests\`, `build.bat`, `src\ajlang.inc`, all `.asm` files as small compiling stubs.
+- The environment, `build.bat`, `run.bat`, the Visual Studio project and every module file already exist from Day 0. Replace the banner stub in `main.asm`.
+- Create the `tests\` files and decide how test output is captured (section 3).
 - `LoadProgram` (file or asked file name), line splitting and trimming.
 - `ReadWord`, `UpperCaseWord`, keyword table, `RunProgram` dispatch loop.
 - `likho` with plain text only, `#` comments, blank lines, `ruko`, case-insensitive keywords.
@@ -235,7 +243,7 @@ Command from the user: `Do Day N`.
 
 | Day | Status | Notes |
 |---|---|---|
-| 0 | done | Spec finalised, context file, repo created |
+| 0 | done | Spec finalised, context file, repo (private) created. Multi-file MASM project, `build.bat`, `run.bat`, `AJlang.slnx` and `AJlang.vcxproj` set up and verified: both build paths produce `build\ajlang.exe`. Stub `main` prints a banner. Stdout redirection loses Irvine output (see section 3). |
 | 1 | not started | |
 | 2 | not started | |
 | 3 | not started | |
@@ -251,6 +259,6 @@ Outside-lab constructs used: `GetCommandTail`, `OpenInputFile`, `ReadFromFile`, 
 
 ## 12. Repo
 
-- GitHub: `jawwadmalik0704/AJlang` (public). Collaborator: `AhmedMustafa-0817`.
+- GitHub: `jawwadmalik0704/AJlang` (**private** for now, make it public only when the user says so). Collaborator: `AhmedMustafa-0817` (invite sent, must be accepted).
 - Branch `main`. Pull before starting, push at the end of each day. Daily work is one commit (or a few) per day to keep history readable.
 - Lab manuals are not in the repo (they live in `D:\lab manuals`).

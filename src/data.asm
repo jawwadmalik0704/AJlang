@@ -1,0 +1,27 @@
+INCLUDE ajlang.inc
+
+.data
+sourceLines BYTE MAXLINES * LINELEN DUP(0)
+lineCount DWORD 0
+lineIndex DWORD 0
+fileName BYTE 128 DUP(0)
+wordBuffer BYTE LINELEN DUP(0)
+
+blockEnd DWORD MAXLINES DUP(0)
+blockStart DWORD MAXLINES DUP(0)
+nextBranch DWORD MAXLINES DUP(0)
+previousBranch DWORD MAXLINES DUP(0)
+blockStack DWORD MAXDEPTH DUP(0)
+stackDepth DWORD 0
+
+varName BYTE MAXVARS * NAMELEN DUP(0)
+varFirstCell DWORD MAXVARS DUP(0)
+varLength DWORD MAXVARS DUP(0)
+varCount DWORD 0
+
+cellType DWORD MAXCELLS DUP(CELL_EMPTY)
+cellNumber DWORD MAXCELLS DUP(0)
+cellText BYTE MAXCELLS * TEXTLEN DUP(0)
+cellCount DWORD 0
+
+END
