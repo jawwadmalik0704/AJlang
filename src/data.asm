@@ -8,6 +8,7 @@ lineIndex DWORD 0
 currentLine DWORD 0
 fileName BYTE FILENAME_SIZE DUP(0)
 wordBuffer BYTE LINELEN DUP(0)
+nameBuffer BYTE LINELEN DUP(0)
 
 blockEnd DWORD MAXLINES DUP(0)
 blockStart DWORD MAXLINES DUP(0)

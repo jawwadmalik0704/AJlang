@@ -223,6 +223,20 @@ Rules for the plan: each day ends with a working `ajlang.exe`, passing test prog
 - Errors: undefined variable, name too long, too many variables.
 - Done when `tests\day2.aj` shows `set`, text and number mix, `likho Hi :name, age :age`, `batao`, all four operators, and each error.
 
+### Notes from Day 2 for later days
+
+- Names: `ReadName` copies a name (letter or `_` first, then letters, digits, `_`) into `nameBuffer` and returns the pointer after it. An empty `nameBuffer` means no name was there. `nameBuffer` is overwritten by every `ReadName`, so save what you need first.
+- `DeclareVariable` returns the variable index (finds or creates, reports its own errors, -1 on error). `CellForReference` returns the cell of a defined variable or reports `define nahi hai` and returns -1. Day 4 extends it for `name[i]`.
+- `ReadNumberValue, text, ADDR result` turns a whole text (number literal or number variable) into a number and reports its own errors. Day 3 conditions can copy each side into a buffer and call it, or use `ParseNumber`/`CellForReference` directly.
+- `ParseNumber` accepts the whole string only (`-`, digits, then end). `IsNumberText` only checks the first character.
+- `StoreValue, cell, text` sets number or text by the first character. Used by `set` and `batao`.
+- Math lines are found in `RunLine` when `MatchKeyword` gives `KW_UNKNOWN` and `IsMathLine` says the line is `name op= ...`.
+- `likho` walks the text twice (`WriteLikhoText` with `shouldPrint` 0, then 1), so an undefined `:var` reports the error before anything is printed.
+- Irvine32 already defines `IsDigit`, so ours is `IsDigitCharacter`. Check for name clashes with Irvine when adding procedures.
+- Irvine `WriteInt` prints a `+` for positive numbers, so `WriteNumber` in `print.asm` is used instead.
+- Pass `ADDR local` only as an argument that is not `eax`: `INVOKE` uses `eax` to compute `ADDR` of a local.
+- Tests: if `pywinpty` was installed with `pip install --user`, run the tests without `-I` (`py tests\run_tests.py`), because `-I` hides user packages. The runner drops a trailing `0011Ignore` line that the pseudo-console sometimes adds after the program exits.
+
 ### Day 3: Decisions and loops
 - `PrescanBlocks` with stack, jump tables, missing/stray `/` errors.
 - `EvaluateCondition` (six operators, text `==`/`!=`).
@@ -256,7 +270,7 @@ Command from the user: `Do Day N`.
 |---|---|---|
 | 0 | done | Spec finalised, context file, repo (private) created. Multi-file MASM project, `build.bat`, `run.bat`, `AJlang.slnx` and `AJlang.vcxproj` set up and verified: both build paths produce `build\ajlang.exe`. Stub `main` prints a banner. Stdout redirection loses Irvine output (see section 3). |
 | 1 | done | `LoadProgram` (command-line file or prompt, BOM and CRLF handled, 200-line limit), `SkipSpaces`, `ReadWord`, `MatchKeyword`, dispatch in `RunLine`, `likho` (plain text), `ruko`, `#` comments, `ReportError` with line numbers. `tests\day1.aj` and `day1_error.aj` pass; extra edge cases checked by hand (missing file, 201 lines, empty file, tabs, no final newline). Both `build.bat` and `AJlang.slnx` build. |
-| 2 | not started | |
+| 2 | done | `set` (number, text, `set x` alone gives number 0, re-`set` may change the type), `likho` with `:var` and `::`, `batao` (number if the input starts with a digit or `-`, else text), `x+=n` `x-=n` `x*=n` `x/=n` (right side a number or a number variable, spaces around the operator allowed, IDIV truncates toward zero). Errors: `define nahi hai`, `naam bohot lamba hai`, `bohot zyada variables`, `yahan number chahiye` (text in math, or bad number like `12abc`), `zero se divide nahi hota`, and `ye command samajh nahi aya` for a bad `set`/`batao` line. 12/12 tests pass (`day1*`, `day2*`); both `build.bat` and MSBuild on `AJlang.vcxproj` build. Text longer than 63 characters is cut to 63. |
 | 3 | not started | |
 | 4 | not started | |
 

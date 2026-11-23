@@ -2,18 +2,18 @@ INCLUDE ajlang.inc
 
 .code
 RunLine PROC
-    LOCAL textPointer:DWORD
+    LOCAL lineStart:DWORD, textPointer:DWORD
 
     INVOKE GetLineAddress, currentLine
     INVOKE SkipSpaces, eax
-    mov textPointer, eax
+    mov lineStart, eax
 
     cmp BYTE PTR [eax], 0
     je ContinueProgram
     cmp BYTE PTR [eax], '#'
     je ContinueProgram
 
-    INVOKE ReadWord, textPointer
+    INVOKE ReadWord, lineStart
     mov textPointer, eax
     INVOKE MatchKeyword
 
@@ -21,6 +21,14 @@ RunLine PROC
     je RunLikho
     cmp eax, KW_RUKO
     je RunRuko
+    cmp eax, KW_SET
+    je RunSet
+    cmp eax, KW_BATAO
+    je RunBatao
+
+    INVOKE IsMathLine, lineStart
+    cmp eax, 0
+    jne RunMath
 
     INVOKE ReportError, ADDR unknownCommandMessage
     mov eax, 0
@@ -32,6 +40,18 @@ RunLikho:
 
 RunRuko:
     INVOKE DoRuko
+    ret
+
+RunSet:
+    INVOKE DoSet, textPointer
+    ret
+
+RunBatao:
+    INVOKE DoBatao, textPointer
+    ret
+
+RunMath:
+    INVOKE DoMath, lineStart
     ret
 
 ContinueProgram:
