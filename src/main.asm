@@ -25,6 +25,18 @@ RunLine PROC
     je RunSet
     cmp eax, KW_BATAO
     je RunBatao
+    cmp eax, KW_AGAR
+    je RunAgar
+    cmp eax, KW_WARNA
+    je RunWarna
+    cmp eax, KW_LOOP
+    je RunLoop
+    cmp eax, KW_REPEAT
+    je RunRepeat
+    cmp eax, KW_END
+    je RunEnd
+    cmp eax, KW_RANDO
+    je RunRando
 
     INVOKE IsMathLine, lineStart
     cmp eax, 0
@@ -48,6 +60,30 @@ RunSet:
 
 RunBatao:
     INVOKE DoBatao, textPointer
+    ret
+
+RunAgar:
+    INVOKE DoAgar, textPointer
+    ret
+
+RunWarna:
+    INVOKE DoWarna
+    ret
+
+RunLoop:
+    INVOKE DoLoop
+    ret
+
+RunRepeat:
+    INVOKE DoRepeat, textPointer
+    ret
+
+RunEnd:
+    INVOKE DoEnd
+    ret
+
+RunRando:
+    INVOKE DoRando, textPointer
     ret
 
 RunMath:
@@ -80,6 +116,10 @@ main PROC
     INVOKE LoadProgram
     cmp eax, 0
     je Finish
+    INVOKE PrescanBlocks
+    cmp eax, 0
+    je Finish
+    call Randomize
     INVOKE RunProgram
 
 Finish:

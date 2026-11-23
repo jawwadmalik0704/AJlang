@@ -39,6 +39,8 @@ Finish:
 PrintCell ENDP
 
 WriteInsert PROC USES esi, colonPointer:DWORD, shouldPrint:DWORD
+    LOCAL cell:DWORD
+
     mov esi, colonPointer
     inc esi
     cmp BYTE PTR [esi], ':'
@@ -47,14 +49,14 @@ WriteInsert PROC USES esi, colonPointer:DWORD, shouldPrint:DWORD
     INVOKE ReadName, esi
     cmp nameBuffer, 0
     je WriteColon
-    mov esi, eax
 
-    INVOKE CellForReference, ADDR nameBuffer
-    cmp eax, -1
+    INVOKE ReferenceCell, esi, ADDR cell, 1
+    cmp eax, 0
     je Failed
+    mov esi, eax
     cmp shouldPrint, 0
     je Finish
-    INVOKE PrintCell, eax
+    INVOKE PrintCell, cell
     jmp Finish
 
 DoubleColon:
@@ -140,10 +142,9 @@ DoBatao PROC USES ecx edx, textPointer:DWORD
     cmp BYTE PTR [eax], 0
     jne BadCommand
 
-    INVOKE DeclareVariable, ADDR nameBuffer
+    INVOKE DeclareScalarCell, ADDR nameBuffer
     cmp eax, -1
     je Failed
-    mov eax, varFirstCell[eax * 4]
     mov cell, eax
 
     mov edx, OFFSET inputBuffer

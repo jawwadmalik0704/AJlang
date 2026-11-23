@@ -29,11 +29,7 @@ NotFound:
     ret
 FindVariable ENDP
 
-DeclareVariable PROC USES ebx, namePointer:DWORD
-    INVOKE FindVariable, namePointer
-    cmp eax, -1
-    jne Finish
-
+CreateVariable PROC USES ebx, namePointer:DWORD, cellsNeeded:DWORD, arrayLength:DWORD
     INVOKE Str_length, namePointer
     cmp eax, NAMELEN - 1
     ja NameTooLong
@@ -42,18 +38,20 @@ DeclareVariable PROC USES ebx, namePointer:DWORD
     cmp ebx, MAXVARS
     jae TooManyVariables
     mov eax, cellCount
+    add eax, cellsNeeded
     cmp eax, MAXCELLS
-    jae TooManyVariables
+    ja TooManyVariables
 
+    mov eax, cellCount
     mov varFirstCell[ebx * 4], eax
-    mov varLength[ebx * 4], 0
-    inc cellCount
+    mov eax, arrayLength
+    mov varLength[ebx * 4], eax
+    mov eax, cellsNeeded
+    add cellCount, eax
     INVOKE GetVariableName, ebx
     INVOKE Str_copy, namePointer, eax
     inc varCount
     mov eax, ebx
-
-Finish:
     ret
 
 NameTooLong:
@@ -65,20 +63,151 @@ TooManyVariables:
     INVOKE ReportError, ADDR tooManyVariablesMessage
     mov eax, -1
     ret
-DeclareVariable ENDP
+CreateVariable ENDP
 
-CellForReference PROC, namePointer:DWORD
+DeclareVariable PROC, namePointer:DWORD
     INVOKE FindVariable, namePointer
     cmp eax, -1
-    je NotDefined
+    jne Finish
+    INVOKE CreateVariable, namePointer, 1, 0
+
+Finish:
+    ret
+DeclareVariable ENDP
+
+DeclareScalarCell PROC, namePointer:DWORD
+    INVOKE DeclareVariable, namePointer
+    cmp eax, -1
+    je Finish
+    cmp varLength[eax * 4], 0
+    jne NeedsIndex
     mov eax, varFirstCell[eax * 4]
+
+Finish:
+    ret
+
+NeedsIndex:
+    INVOKE ReportNameError, namePointer, ADDR arrayNeedsIndexMessage
+    mov eax, -1
+    ret
+DeclareScalarCell ENDP
+
+DeclareArray PROC, namePointer:DWORD, arrayLength:DWORD
+    INVOKE FindVariable, namePointer
+    cmp eax, -1
+    jne AlreadyDefined
+    cmp arrayLength, 0
+    je BadSize
+    INVOKE CreateVariable, namePointer, arrayLength, arrayLength
+    ret
+
+AlreadyDefined:
+    INVOKE ReportNameError, namePointer, ADDR alreadyDefinedMessage
+    mov eax, -1
+    ret
+
+BadSize:
+    INVOKE ReportError, ADDR badArraySizeMessage
+    mov eax, -1
+    ret
+DeclareArray ENDP
+
+ReferenceCell PROC USES ebx esi edi, textPointer:DWORD, resultPointer:PTR DWORD, mustBeSet:DWORD
+    LOCAL variableIndex:DWORD, index:DWORD, savedName[NAMELEN]:BYTE, indexText[LINELEN]:BYTE
+
+    INVOKE ReadName, textPointer
+    mov esi, eax
+    cmp nameBuffer, 0
+    je BadReference
+    INVOKE FindVariable, ADDR nameBuffer
+    cmp eax, -1
+    je NotDefined
+    mov variableIndex, eax
+    INVOKE Str_copy, ADDR nameBuffer, ADDR savedName
+
+    mov ebx, variableIndex
+    cmp BYTE PTR [esi], '['
+    je ReadIndex
+    cmp varLength[ebx * 4], 0
+    jne NeedsIndex
+    mov ebx, varFirstCell[ebx * 4]
+    jmp CheckIsSet
+
+ReadIndex:
+    cmp varLength[ebx * 4], 0
+    je NotAnArray
+    inc esi
+    lea edi, indexText
+
+CopyIndexCharacter:
+    mov al, [esi]
+    cmp al, 0
+    je BadReference
+    cmp al, ']'
+    je EndOfIndex
+    mov [edi], al
+    inc esi
+    inc edi
+    jmp CopyIndexCharacter
+
+EndOfIndex:
+    mov BYTE PTR [edi], 0
+    inc esi
+    INVOKE ReadNumberValue, ADDR indexText, ADDR index
+    cmp eax, 0
+    je Failed
+    mov eax, index
+    cmp eax, 0
+    jl OutOfRange
+    cmp eax, varLength[ebx * 4]
+    jge OutOfRange
+    add eax, varFirstCell[ebx * 4]
+    mov ebx, eax
+
+CheckIsSet:
+    cmp mustBeSet, 0
+    je StoreCell
+    cmp cellType[ebx * 4], CELL_EMPTY
+    jne StoreCell
+    mov eax, variableIndex
+    cmp varLength[eax * 4], 0
+    jne SlotNotSet
+    INVOKE ReportNameError, ADDR savedName, ADDR undefinedVariableMessage
+    jmp Failed
+
+SlotNotSet:
+    INVOKE ReportIndexError, ADDR savedName, index, ADDR undefinedVariableMessage
+    jmp Failed
+
+StoreCell:
+    mov eax, resultPointer
+    mov [eax], ebx
+    mov eax, esi
     ret
 
 NotDefined:
-    INVOKE ReportNameError, namePointer, ADDR undefinedVariableMessage
-    mov eax, -1
+    INVOKE ReportNameError, ADDR nameBuffer, ADDR undefinedVariableMessage
+    jmp Failed
+
+NeedsIndex:
+    INVOKE ReportNameError, ADDR savedName, ADDR arrayNeedsIndexMessage
+    jmp Failed
+
+NotAnArray:
+    INVOKE ReportNameError, ADDR savedName, ADDR notAnArrayMessage
+    jmp Failed
+
+OutOfRange:
+    INVOKE ReportIndexError, ADDR savedName, index, ADDR outOfRangeMessage
+    jmp Failed
+
+BadReference:
+    INVOKE ReportError, ADDR unknownCommandMessage
+
+Failed:
+    mov eax, 0
     ret
-CellForReference ENDP
+ReferenceCell ENDP
 
 GetCellTextAddress PROC, cell:DWORD
     mov eax, cell
@@ -146,26 +275,27 @@ NotANumber:
 StoreValue ENDP
 
 ReadNumberValue PROC, textPointer:DWORD, resultPointer:PTR DWORD
+    LOCAL cell:DWORD
+
     INVOKE IsNumberText, textPointer
     cmp eax, 0
-    je ReadVariable
+    je ReadReference
 
     INVOKE ParseNumber, textPointer, resultPointer
     cmp eax, 0
     je NotANumber
     ret
 
-ReadVariable:
+ReadReference:
     INVOKE ReadName, textPointer
     cmp nameBuffer, 0
     je NotANumber
+    INVOKE ReferenceCell, textPointer, ADDR cell, 1
+    cmp eax, 0
+    je Failed
     cmp BYTE PTR [eax], 0
     jne NotANumber
-
-    INVOKE CellForReference, ADDR nameBuffer
-    cmp eax, -1
-    je Failed
-    INVOKE GetCellNumber, eax, resultPointer
+    INVOKE GetCellNumber, cell, resultPointer
     ret
 
 NotANumber:
@@ -176,36 +306,69 @@ Failed:
     ret
 ReadNumberValue ENDP
 
-DoSet PROC, textPointer:DWORD
-    LOCAL valuePointer:DWORD, cell:DWORD
+DoSet PROC USES esi, textPointer:DWORD
+    LOCAL referencePointer:DWORD, valuePointer:DWORD, cell:DWORD, arrayLength:DWORD
 
     INVOKE SkipSpaces, textPointer
+    mov referencePointer, eax
     INVOKE ReadName, eax
-    mov valuePointer, eax
+    mov esi, eax
     cmp nameBuffer, 0
     je BadCommand
-    movzx eax, BYTE PTR [eax]
+    cmp BYTE PTR [esi], '['
+    je SetWithIndex
+
+    movzx eax, BYTE PTR [esi]
     INVOKE IsWordEnd, eax
     cmp eax, 0
     je BadCommand
-
-    INVOKE DeclareVariable, ADDR nameBuffer
-    cmp eax, -1
-    je Failed
-    mov eax, varFirstCell[eax * 4]
-    mov cell, eax
-
-    INVOKE SkipSpaces, valuePointer
+    INVOKE SkipSpaces, esi
     mov valuePointer, eax
     cmp BYTE PTR [eax], 0
-    je SetToZero
+    je ValueNeeded
+
+    INVOKE DeclareScalarCell, ADDR nameBuffer
+    cmp eax, -1
+    je Failed
+    mov cell, eax
     INVOKE StoreValue, cell, valuePointer
     ret
 
-SetToZero:
-    INVOKE SetCellNumber, cell, 0
+SetWithIndex:
+    INVOKE SkipIndex, esi
+    cmp eax, 0
+    je BadCommand
+    INVOKE SkipSpaces, eax
+    mov valuePointer, eax
+    cmp BYTE PTR [eax], 0
+    je DeclareNewArray
+
+    INVOKE ReferenceCell, referencePointer, ADDR cell, 0
+    cmp eax, 0
+    je Failed
+    INVOKE StoreValue, cell, valuePointer
+    ret
+
+DeclareNewArray:
+    inc esi
+    INVOKE ParseDigits, esi, ADDR arrayLength
+    cmp eax, 0
+    je BadSize
+    cmp BYTE PTR [eax], ']'
+    jne BadSize
+    INVOKE DeclareArray, ADDR nameBuffer, arrayLength
+    cmp eax, -1
+    je Failed
     mov eax, 1
     ret
+
+BadSize:
+    INVOKE ReportError, ADDR badArraySizeMessage
+    jmp Failed
+
+ValueNeeded:
+    INVOKE ReportError, ADDR valueNeededMessage
+    jmp Failed
 
 BadCommand:
     INVOKE ReportError, ADDR unknownCommandMessage
@@ -256,16 +419,14 @@ ApplyOperator ENDP
 DoMath PROC USES esi, textPointer:DWORD
     LOCAL operator:DWORD, leftCell:DWORD, leftValue:DWORD, rightValue:DWORD
 
-    INVOKE ReadName, textPointer
+    INVOKE ReferenceCell, textPointer, ADDR leftCell, 1
+    cmp eax, 0
+    je Failed
     INVOKE SkipSpaces, eax
     mov esi, eax
     movzx eax, BYTE PTR [esi]
     mov operator, eax
 
-    INVOKE CellForReference, ADDR nameBuffer
-    cmp eax, -1
-    je Failed
-    mov leftCell, eax
     INVOKE GetCellNumber, leftCell, ADDR leftValue
     cmp eax, 0
     je Failed

@@ -121,4 +121,156 @@ TooLong:
     ret
 LoadProgram ENDP
 
+TopBlock PROC
+    mov eax, stackDepth
+    dec eax
+    mov eax, blockStack[eax * 4]
+    ret
+TopBlock ENDP
+
+OpenBlock PROC USES edx, lineNumber:DWORD
+    cmp stackDepth, MAXDEPTH
+    jae TooDeep
+    mov eax, stackDepth
+    mov edx, lineNumber
+    mov blockStack[eax * 4], edx
+    mov previousBranch[edx * 4], edx
+    inc stackDepth
+    mov eax, 1
+    ret
+
+TooDeep:
+    INVOKE ReportError, ADDR tooDeepMessage
+    mov eax, 0
+    ret
+OpenBlock ENDP
+
+AddBranch PROC USES ebx esi, lineNumber:DWORD
+    cmp stackDepth, 0
+    je StrayWarna
+    INVOKE TopBlock
+    mov ebx, eax
+    INVOKE GetLineKeyword, ebx
+    cmp eax, KW_AGAR
+    jne StrayWarna
+
+    INVOKE GetTextAfterWord, lineNumber
+    INVOKE ElseConditionPointer, eax
+    cmp eax, -1
+    je BadWarna
+
+    mov esi, previousBranch[ebx * 4]
+    cmp esi, ebx
+    je LinkBranch
+    INVOKE GetTextAfterWord, esi
+    INVOKE ElseConditionPointer, eax
+    cmp eax, 0
+    je ElseAgain
+
+LinkBranch:
+    mov eax, lineNumber
+    mov nextBranch[esi * 4], eax
+    mov previousBranch[ebx * 4], eax
+    mov eax, 1
+    ret
+
+StrayWarna:
+    INVOKE ReportError, ADDR strayWarnaMessage
+    mov eax, 0
+    ret
+
+BadWarna:
+    INVOKE ReportError, ADDR unknownCommandMessage
+    mov eax, 0
+    ret
+
+ElseAgain:
+    INVOKE ReportError, ADDR elseAgainMessage
+    mov eax, 0
+    ret
+AddBranch ENDP
+
+CloseBlock PROC USES ebx edx esi, lineNumber:DWORD
+    cmp stackDepth, 0
+    je StrayEnd
+    INVOKE TopBlock
+    mov ebx, eax
+    dec stackDepth
+
+    mov edx, lineNumber
+    mov blockStart[edx * 4], ebx
+    mov esi, previousBranch[ebx * 4]
+    mov nextBranch[esi * 4], edx
+    mov esi, ebx
+
+MarkBranch:
+    mov blockEnd[esi * 4], edx
+    mov esi, nextBranch[esi * 4]
+    cmp esi, edx
+    jne MarkBranch
+    mov eax, 1
+    ret
+
+StrayEnd:
+    INVOKE ReportError, ADDR strayEndMessage
+    mov eax, 0
+    ret
+CloseBlock ENDP
+
+PrescanBlocks PROC USES ebx
+    mov stackDepth, 0
+    mov ebx, 0
+
+CheckLine:
+    cmp ebx, lineCount
+    jae CheckUnclosed
+    mov currentLine, ebx
+    INVOKE GetLineKeyword, ebx
+    cmp eax, KW_AGAR
+    je Open
+    cmp eax, KW_LOOP
+    je Open
+    cmp eax, KW_REPEAT
+    je Open
+    cmp eax, KW_WARNA
+    je Branch
+    cmp eax, KW_END
+    je Close
+    jmp NextLine
+
+Open:
+    INVOKE OpenBlock, ebx
+    jmp CheckResult
+
+Branch:
+    INVOKE AddBranch, ebx
+    jmp CheckResult
+
+Close:
+    INVOKE CloseBlock, ebx
+
+CheckResult:
+    cmp eax, 0
+    je Failed
+
+NextLine:
+    inc ebx
+    jmp CheckLine
+
+CheckUnclosed:
+    cmp stackDepth, 0
+    je Finish
+    INVOKE TopBlock
+    mov currentLine, eax
+    INVOKE ReportError, ADDR missingEndMessage
+
+Failed:
+    mov eax, 0
+    ret
+
+Finish:
+    mov eax, 1
+    ret
+PrescanBlocks ENDP
+
 END

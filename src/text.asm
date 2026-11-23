@@ -5,7 +5,15 @@ likhoWord BYTE "LIKHO",0
 rukoWord BYTE "RUKO",0
 setWord BYTE "SET",0
 bataoWord BYTE "BATAO",0
-keywordTable DWORD OFFSET likhoWord, OFFSET rukoWord, OFFSET setWord, OFFSET bataoWord, 0
+agarWord BYTE "AGAR",0
+warnaWord BYTE "WARNA",0
+loopWord BYTE "LOOP",0
+repeatWord BYTE "REPEAT",0
+endWord BYTE "/",0
+randoWord BYTE "RANDO",0
+keywordTable DWORD OFFSET likhoWord, OFFSET rukoWord, OFFSET setWord, OFFSET bataoWord
+             DWORD OFFSET agarWord, OFFSET warnaWord, OFFSET loopWord, OFFSET repeatWord
+             DWORD OFFSET endWord, OFFSET randoWord, 0
 
 .code
 GetLineAddress PROC, lineNumber:DWORD
@@ -14,6 +22,19 @@ GetLineAddress PROC, lineNumber:DWORD
     add eax, OFFSET sourceLines
     ret
 GetLineAddress ENDP
+
+GetTextAfterWord PROC, lineNumber:DWORD
+    INVOKE GetLineAddress, lineNumber
+    INVOKE SkipSpaces, eax
+    INVOKE ReadWord, eax
+    ret
+GetTextAfterWord ENDP
+
+GetLineKeyword PROC, lineNumber:DWORD
+    INVOKE GetTextAfterWord, lineNumber
+    INVOKE MatchKeyword
+    ret
+GetLineKeyword ENDP
 
 SkipSpaces PROC, textPointer:DWORD
     mov eax, textPointer
@@ -56,6 +77,28 @@ Finish:
     ret
 ReadWord ENDP
 
+ReadToken PROC USES esi edi, source:DWORD, destination:DWORD
+    INVOKE SkipSpaces, source
+    mov esi, eax
+    mov edi, destination
+
+CopyCharacter:
+    movzx eax, BYTE PTR [esi]
+    INVOKE IsWordEnd, eax
+    cmp eax, 0
+    jne Finish
+    mov al, [esi]
+    mov [edi], al
+    inc esi
+    inc edi
+    jmp CopyCharacter
+
+Finish:
+    mov BYTE PTR [edi], 0
+    mov eax, esi
+    ret
+ReadToken ENDP
+
 MatchKeyword PROC USES ebx edx
     mov ebx, 0
 
@@ -76,6 +119,29 @@ NotFound:
     mov eax, KW_UNKNOWN
     ret
 MatchKeyword ENDP
+
+ElseConditionPointer PROC, textPointer:DWORD
+    LOCAL afterWord:DWORD
+
+    INVOKE SkipSpaces, textPointer
+    cmp BYTE PTR [eax], 0
+    je PlainElse
+
+    INVOKE ReadWord, eax
+    mov afterWord, eax
+    INVOKE Str_compare, ADDR wordBuffer, ADDR agarWord
+    jne BadElse
+    mov eax, afterWord
+    ret
+
+PlainElse:
+    mov eax, 0
+    ret
+
+BadElse:
+    mov eax, -1
+    ret
+ElseConditionPointer ENDP
 
 IsDigitCharacter PROC, character:DWORD
     mov eax, character
@@ -182,6 +248,27 @@ Finish:
     ret
 ReadName ENDP
 
+SkipIndex PROC, textPointer:DWORD
+    mov eax, textPointer
+    cmp BYTE PTR [eax], '['
+    jne Finish
+
+FindClosingBracket:
+    inc eax
+    cmp BYTE PTR [eax], 0
+    je Unclosed
+    cmp BYTE PTR [eax], ']'
+    jne FindClosingBracket
+    inc eax
+
+Finish:
+    ret
+
+Unclosed:
+    mov eax, 0
+    ret
+SkipIndex ENDP
+
 IsNumberText PROC, textPointer:DWORD
     mov eax, textPointer
     movzx eax, BYTE PTR [eax]
@@ -195,18 +282,10 @@ Yes:
     ret
 IsNumberText ENDP
 
-ParseNumber PROC USES ebx ecx esi, textPointer:DWORD, resultPointer:PTR DWORD
-    LOCAL isNegative:DWORD
-
+ParseDigits PROC USES ebx ecx esi, textPointer:DWORD, resultPointer:PTR DWORD
     mov esi, textPointer
     mov ebx, 0
     mov ecx, 0
-    mov isNegative, 0
-
-    cmp BYTE PTR [esi], '-'
-    jne ReadDigit
-    mov isNegative, 1
-    inc esi
 
 ReadDigit:
     movzx eax, BYTE PTR [esi]
@@ -223,17 +302,42 @@ ReadDigit:
 
 EndOfDigits:
     cmp ecx, 0
-    je NotANumber
-    cmp BYTE PTR [esi], 0
-    jne NotANumber
-
-    cmp isNegative, 0
-    je StoreResult
-    neg ebx
-
-StoreResult:
+    je NoDigits
     mov eax, resultPointer
     mov [eax], ebx
+    mov eax, esi
+    ret
+
+NoDigits:
+    mov eax, 0
+    ret
+ParseDigits ENDP
+
+ParseNumber PROC USES ebx, textPointer:DWORD, resultPointer:PTR DWORD
+    LOCAL isNegative:DWORD, magnitude:DWORD
+
+    mov ebx, textPointer
+    mov isNegative, 0
+    cmp BYTE PTR [ebx], '-'
+    jne ReadMagnitude
+    mov isNegative, 1
+    inc ebx
+
+ReadMagnitude:
+    INVOKE ParseDigits, ebx, ADDR magnitude
+    cmp eax, 0
+    je NotANumber
+    cmp BYTE PTR [eax], 0
+    jne NotANumber
+
+    mov eax, magnitude
+    cmp isNegative, 0
+    je StoreResult
+    neg eax
+
+StoreResult:
+    mov ebx, resultPointer
+    mov [ebx], eax
     mov eax, 1
     ret
 
@@ -267,6 +371,9 @@ CopyRestOfLine ENDP
 IsMathLine PROC USES esi, textPointer:DWORD
     INVOKE ReadName, textPointer
     cmp nameBuffer, 0
+    je No
+    INVOKE SkipIndex, eax
+    cmp eax, 0
     je No
 
     INVOKE SkipSpaces, eax
